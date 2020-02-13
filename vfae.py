@@ -11,9 +11,10 @@ import torch.optim as optim
 from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
 
-from model.models.model import CausalFair
+from model.models.model import FairVAE
 from data import get_adult, get_german
-from model.models.losses import kl_standard_normal
+from model.models.losses import kl_standard_normal, kl_normal_normal
+from model.models.losses import compute_mmd
 
 from sinkhorn import sinkhorn_loss_primal
 
@@ -29,6 +30,8 @@ parser.add_argument('--critic_iter', type=int, default=10)
 parser.add_argument('--wstart', type=int, default=10)
 ## model parameters ##
 parser.add_argument('--latent_size', type=int, default=32)
+parser.add_argument('--z1_dim', type=int, default=50)
+parser.add_argument('--z2_dim', type=int, default=50)
 parser.add_argument('--hidden_dim', type=int, default=100)
 parser.add_argument('--disc_size', type=int, default=0)
 ## main ##
@@ -65,14 +68,12 @@ def train(model):
     model.train()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.98))
     dis_optimizer = torch.optim.Adam(critic.parameters(), lr=args.lr, betas=(0.9, 0.98))
-    cont_dim = latent_spec['cont']
-    disc_dim = latent_spec['disc']
     writer = SummaryWriter("runs/fair")
     print('Start training.')
     try:
         for epoch in range(args.epochs):
             re_loss = 0
-            re_loss2 = 0
+            c_loss = 0
             size = 0
             correct = 0
             correct_g = 0
@@ -85,84 +86,41 @@ def train(model):
                 inputs, labels, factor = [d.to(device) for d in data]
                 batch_size = inputs.size(0)
                 x = torch.cat((factor, inputs), dim=-1)
+                
+                out, z1, z2, z1_z2y, logit, probs = model(inputs, factor, labels)
                 labels = labels.long().squeeze(1)
-                out, z, y, q_z = model(x)
-                closs = F.cross_entropy(y, labels)  # mean
-                reloss = F.mse_loss(out, x) # mean
-                kld = kl_standard_normal(q_z)   # mean
-                loss = closs
-                if args.ite and epoch >= args.wstart:
-                    for _ in range(args.critic_iter):
-                        for p in critic.parameters():
-                            p.data.clamp_(-args.weight_cliping_limit, args.weight_cliping_limit)
-                        # disloss = 0
-                        # wloss = 0
-                        # # for n in range(s.size(-1)):
-                        # x_0 = torch.cat((torch.zeros(batch_size, 1).to(inputs.device), inputs), dim=-1)
-                        # z_0 = model.encode(x_0).rsample() # z ~ q(z|do(s), x)
-                        # dis_int = critic(z_0).mean()
-                        # x_1 = torch.cat((torch.ones(batch_size, 1).to(inputs.device), inputs), dim=-1)
-                        # z_1 = model.encode(x_1).rsample()
-                        # dis_real = critic(z_1).mean()
-                        # disloss = dis_int - dis_real
-                        # wloss = dis_real - dis_int
-                        # dis_optimizer.zero_grad()
-                        # disloss.backward(retain_graph=True)
-                        # dis_optimizer.step()
-
-                        inputs_next = data_iter.next()[0].to(device)
-                        x_0 = torch.cat((torch.zeros(inputs_next.size(0), 1).to(inputs.device), inputs_next), dim=-1)
-                        z_0 = model.encode(x_0).rsample() # z ~ q(z|do(s), x)
-                        dis_int = critic(z_0)
-                        x_1 = torch.cat((torch.ones(inputs_next.size(0), 1).to(inputs.device), inputs_next), dim=-1)
-                        z_1 = model.encode(x_1).rsample()
-                        dis_real = critic(z_1)
-                        sink_f = 2*sinkhorn_loss_primal(dis_int, dis_real, 1, inputs_next.size(0), 20) \
-                                - sinkhorn_loss_primal(dis_int, dis_int, 1, inputs_next.size(0), 20) \
-                                - sinkhorn_loss_primal(dis_real, dis_real, 1, inputs_next.size(0), 20)
-                        dis_optimizer.zero_grad()
-                        sink_f.backward(retain_graph=True)
-                        dis_optimizer.step()
-
-                    y_0 = model.z_to_y(z_0).mean() # p(y|do(s), x) = \int_z p(y|z)p(z|do(s), x)
-                    y_1 = model.z_to_y(z_1).mean()
-                    # loss += wloss
-
-                    inputs_next = data_iter.next()[0].to(device)
-                    x_0 = torch.cat((torch.zeros(inputs_next.size(0), 1).to(inputs.device), inputs_next), dim=-1)
-                    z_0 = model.encode(x_0).rsample() # z ~ q(z|do(s), x)
-                    dis_int = critic(z_0)
-                    x_1 = torch.cat((torch.ones(inputs_next.size(0), 1).to(inputs.device), inputs_next), dim=-1)
-                    z_1 = model.encode(x_1).rsample()
-                    dis_real = critic(z_1)
-                    wloss = 2*sinkhorn_loss_primal(dis_int, dis_real, 1, inputs_next.size(0), 20) \
-                            - sinkhorn_loss_primal(dis_int, dis_int, 1, inputs_next.size(0), 20) \
-                            - sinkhorn_loss_primal(dis_real, dis_real, 1, inputs_next.size(0), 20)
-                    
-                    loss += wloss
-                else:
-                    wloss = torch.zeros(1)
-
+                
+                # reloss = F.mse_loss(out, inputs)    # mean
+                reloss = F.binary_cross_entropy_with_logits(out, inputs)
+                kld_z1 = kl_normal_normal(probs['z1_xu'], probs['z1_z2y'])
+                kld_z2 = kl_standard_normal(probs['z2_z1y'])    # mean
+                closs = F.cross_entropy(logit, labels)  # mean
+                z1_0 = model._q_z1_xu(inputs, torch.zeros_like(factor))
+                z1_1 = model._q_z1_xu(inputs, torch.ones_like(factor))
+                mmd = compute_mmd(z1_0.rsample(), z1_1.rsample())
+                loss = reloss + kld_z2 + kld_z1 + closs + mmd # (z1.log().mean() - z1_z2y.log().mean()) does not work
+                # print('| reloss: {:5.2f} | kld: {:5.2f} | closs {:5.4f} | mmd {:5.2f} '.format(reloss, kld_z2, closs, mmd))
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
 
-                predicted = torch.max(y, dim=-1)[1]
+                predicted = torch.max(logit, dim=-1)[1]
                 correct += (predicted == labels).sum().item()
                 # predicted_g = torch.max(logits, dim=-1)[1]
                 # correct_g += (predicted_g == label_g).sum().item()
                 size += batch_size
-                re_loss += reloss.item() * batch_size
-                kld_loss += kld.item() * batch_size 
-                w_loss += wloss.item() * batch_size
+                re_loss += reloss.item() * batch_size 
+                kld_loss += kld_z2.item() * batch_size
+                c_loss += closs.item() * batch_size
+                mmd_loss += mmd.item() * batch_size
+
             re_loss = re_loss / size
-            re_loss2 /= size
+            c_loss /= size
             kld_loss /= size
             mmd_loss /= size
-            w_loss /= size
             acc = correct / size * 100
             print('-'*90)
-            print('Epoch: {:3d} | reloss: {:5.2f} | kld: {:5.2f} | wloss {:5.4f} | acc {:5.2f}'.format(epoch, re_loss, kld, w_loss, acc))
+            print('Epoch: {:3d} | reloss: {:5.2f} | kld: {:5.2f} | closs {:5.4f} | mmd {:5.2f} | acc {:5.2f}'.format(epoch, re_loss, kld_loss, c_loss, mmd_loss, acc))
             writer.add_scalar('train/reloss', re_loss, epoch * len(train_iter)+i)
             writer.add_scalar('train/kld', kld_loss, epoch * len(train_iter)+i)
             writer.add_scalar('train/wloss', w_loss, epoch * len(train_iter)+i)
@@ -177,7 +135,7 @@ def train(model):
 def evaluate(model):
     model.eval()
     print('Start evaluation.')
-    disc_dim = latent_spec['disc']
+    
     re_loss = 0
     it_estimate = 0
     correct = 0
@@ -187,22 +145,24 @@ def evaluate(model):
         inputs, labels, factor = [d.to(device) for d in data]
         batch_size = inputs.size(0)
         x = torch.cat((factor, inputs), dim=-1)
-        labels = labels.long().squeeze(1)
-        out, z, y, q_z = model(x)
-        closs = F.cross_entropy(y, labels)
-        reloss = F.mse_loss(out, x)
-        kld = kl_standard_normal(q_z)
-
+        
+        out, z1, z2, z1_z2y, logit, probs = model(inputs, factor, labels)
+        labels_ = labels.long().squeeze(1)
+        
+        reloss = F.mse_loss(out, inputs)    # mean
+        kld_z2 = kl_standard_normal(probs['z2_z1y'])    # mean
+        closs = F.cross_entropy(logit, labels_)  # mean
+        z1_0 = model._q_z1_xu(inputs, torch.zeros_like(factor))
+        z1_1 = model._q_z1_xu(inputs, torch.ones_like(factor))
+        mmd = compute_mmd(z1_0.rsample(), z1_1.rsample())
+        loss = reloss + kld_z2 + closs + (z1.log().mean() - z1_z2y.log().mean()) + mmd
+              
         ys = []
-        x_0 = torch.cat((torch.zeros(batch_size, 1).to(inputs.device), inputs), dim=-1)
-        z_0 = model.encode(x_0).rsample() # z ~ q(z|do(s), x)
-        x_1 = torch.cat((torch.ones(batch_size, 1).to(inputs.device), inputs), dim=-1)
-        z_1 = model.encode(x_1).rsample()
-        y_0 = model.z_to_y(z_0) # p(y|do(s), x) = \int_z p(y|z)p(z|do(s), x)
-        y_1 = model.z_to_y(z_1)   
+        _, _, _, _, y_0, _ = model(inputs, torch.zeros_like(factor), labels)
+        _, _, _, _, y_1, _ = model(inputs, torch.ones_like(factor), labels)
 
-        predicted = torch.max(y, dim=-1)[1]
-        correct += (predicted == labels).sum().item()
+        predicted = torch.max(logit, dim=-1)[1]
+        correct += (predicted == labels_).sum().item()
         # logits = model.s_to_p(s)
         # predicted_g = torch.max(logits, dim=-1)[1]
         # correct_g += (predicted_g == label_g).sum().item()
@@ -219,7 +179,7 @@ def evaluate(model):
 
 if __name__ == "__main__":
     
-    latent_spec = {'cont': args.latent_size, 'disc': args.disc_size}
+    latent_spec = {'z1': args.z1_dim, 'z2': args.z2_dim}
     dataset = args.data.rstrip('/').split('/')[-1]
     if dataset == 'adult.data':
         train_iter, test_iter = get_adult(args.data, args.batch_size, args.nogender, args.test_size)
@@ -229,7 +189,7 @@ if __name__ == "__main__":
     for _, (batch, _, _) in enumerate(train_iter):
         input_dim = batch.size(-1)
         break
-    model = CausalFair(input_dim+1, args.hidden_dim, 2, latent_spec).to(device)
+    model = FairVAE(input_dim, args.hidden_dim, 2, latent_spec).to(device)
     code_size = args.latent_size + args.disc_size
     critic = Critic(code_size, 1).to(device)
     train(model)
