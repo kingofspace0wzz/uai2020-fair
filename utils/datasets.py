@@ -15,6 +15,9 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, datasets
 
+from torch.distributions.normal import Normal
+from torch.utils.data.sampler import Sampler
+
 DIR = os.path.abspath(os.path.dirname(__file__))
 COLOUR_BLACK = 0
 COLOUR_WHITE = 1
@@ -70,6 +73,39 @@ def get_dataloaders(dataset, root=None, shuffle=True, pin_memory=True,
                       pin_memory=pin_memory,
                       **kwargs)
 
+class DSpritesSampler(Sampler):
+    def __init__(self, data_source, replacement=False, num_samples=None):
+        self.data_source = data_source
+        self.replacement = replacement
+        self._num_samples = num_samples
+
+        if not isinstance(self.replacement, bool):
+            raise ValueError("replacement should be a boolean value, but got "
+                             "replacement={}".format(self.replacement))
+
+        if self._num_samples is not None and not replacement:
+            raise ValueError("With replacement=False, num_samples should not be specified, "
+                             "since a random permute will be performed.")
+
+        if not isinstance(self.num_samples, int) or self.num_samples <= 0:
+            raise ValueError("num_samples should be a positive integer "
+                             "value, but got num_samples={}".format(self.num_samples))
+
+    @property
+    def num_samples(self):
+        # dataset size might change at runtime
+        if self._num_samples is None:
+            return len(self.data_source)
+        return self._num_samples
+
+    def __iter__(self):
+        n = len(self.data_source)
+        if self.replacement:
+            return iter(torch.randint(high=n, size=(self.num_samples,), dtype=torch.int64).tolist())
+        return iter(torch.randperm(n).tolist())
+
+    def __len__(self):
+        return self.num_samples
 
 class DisentangledDataset(Dataset, abc.ABC):
     """Base Class for disentangled VAE datasets.
@@ -211,6 +247,10 @@ class DSprites(DisentangledDataset):
 
         lat_value = self.lat_values[idx]
         return sample, lat_value
+
+    # def sample(self):
+    #     x_normal = Normal()
+    #     s_normal = Normal()
 
 
 class CelebA(DisentangledDataset):
