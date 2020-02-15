@@ -126,7 +126,7 @@ def get_german(path, batch_size, test_size=0.5):
     test_loader = DataLoader(test_data, batch_size, shuffle=True)
     return train_loader, test_loader
 
-def load_crime(path, sensitive='racePactBlack'):
+def load_crime(path, sensitive='racePctBlack'):
     column_names = ['{}'.format(i) for i in range(127)]
     column_names[-1] = 'target'
     column_names[7] = 'racePctBlack'
@@ -137,7 +137,7 @@ def load_crime(path, sensitive='racePactBlack'):
                               na_values="?", sep=r'\s*,\s*', engine='python')
                   )
     # sensitive attributes; we identify 'race' and 'sex' as sensitive attributes
-    sensitive_attribs = sensitive
+    sensitive_attribs = [sensitive]
     Z = (input_data.loc[:, sensitive_attribs]
          .assign(sex=lambda df: (df[sensitive].astype(int) >= 0.2).astype(int)))
 
@@ -183,7 +183,7 @@ def get_crime(path, batch_size, test_size=0.5):
 
 
 if __name__ == "__main__":
-    train_loader, test_loader = get_adult('adult.data', 5)
+    # train_loader, test_loader = get_adult('adult.data', 5)
     total = 0
     l = 0
     # for i, (x, y, z) in enumerate(train_loader):

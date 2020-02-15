@@ -464,4 +464,4 @@ def preprocess(root, size=(64, 64), img_format='JPEG', center_crop=None):
 
 if __name__ == "__main__":
     dp = DSprites()
-    dp.download()
+    dp[0]
