@@ -61,12 +61,12 @@ class CSVDataset(TensorDataset):
 
 
 def get_adult(path, batch_size, nogender=False, test_size=0.5):
-    X, Y, Z = load_adult(path, nogender)
+    X_train, y_train, Z_train = load_adult(path, nogender)
+    X_test, y_test, Z_test = load_adult('adult.test', nogender)
     # split into train/test set
-    (X_train, X_test, y_train, y_test,
-    Z_train, Z_test) = train_test_split(X, Y, Z, test_size=test_size,
-                                        stratify=Y, random_state=7)
-
+    # (X_train, X_test, y_train, y_test,
+    # Z_train, Z_test) = train_test_split(X, Y, Z, test_size=test_size,
+    #                                     stratify=Y, random_state=7)
     # standardize the data
     scaler = StandardScaler().fit(X_train)
     scale_df = lambda df, scaler: pd.DataFrame(scaler.transform(df), 
@@ -183,7 +183,7 @@ def get_crime(path, batch_size, test_size=0.5):
 
 
 if __name__ == "__main__":
-    # train_loader, test_loader = get_adult('adult.data', 5)
+    train_loader, test_loader = get_adult('adult.data', 5)
     total = 0
     l = 0
     # for i, (x, y, z) in enumerate(train_loader):

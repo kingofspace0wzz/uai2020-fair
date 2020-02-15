@@ -73,7 +73,7 @@ def get_dataloaders(dataset, root=None, shuffle=True, pin_memory=True,
                       pin_memory=pin_memory,
                       **kwargs)
 
-class DSpritesSampler(Sampler):
+class DSpritesUnfairSampler(Sampler):
     def __init__(self, data_source, replacement=False, num_samples=None):
         self.data_source = data_source
         self.replacement = replacement
@@ -102,6 +102,7 @@ class DSpritesSampler(Sampler):
         n = len(self.data_source)
         if self.replacement:
             return iter(torch.randint(high=n, size=(self.num_samples,), dtype=torch.int64).tolist())
+        
         return iter(torch.randperm(n).tolist())
 
     def __len__(self):
