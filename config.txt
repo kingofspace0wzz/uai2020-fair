@@ -1,0 +1,12 @@
+Dataset:
+    Adult: 
+        sensitive: gender
+        target: income
+    German:
+    Bank Marketing:
+        20 attributes for 41188 individuals
+        sensitive: age
+    Crime:
+        135 attributes for 1994 communities
+        sensitive: black
+        target: crime rate

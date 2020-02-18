@@ -183,9 +183,13 @@ if __name__ == "__main__":
     dataset = args.data.rstrip('/').split('/')[-1]
     if dataset == 'adult.data':
         train_iter, test_iter = get_adult(args.data, args.batch_size, args.nogender, args.test_size)
-    else:
+    elif dataset == 'german.data':
         train_iter, test_iter = get_german(args.data, args.batch_size, args.test_size)
-
+    elif dataset == 'communities.data':
+        train_iter, test_iter = get_crime(args.data, args.batch_size, args.test_size)
+    elif dataset == 'bank.csv':
+        train_iter, test_iter = get_bank(args.data, args.batch_size, args.test_size)
+        
     for _, (batch, _, _) in enumerate(train_iter):
         input_dim = batch.size(-1)
         break

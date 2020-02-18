@@ -23,7 +23,11 @@ class Model(nn.Module):
         self.code_dim = self.cont_dim + self.disc_dim
         self.fcmu = nn.Linear(self.cont_dim, self.cont_dim)
         self.fcvar = nn.Linear(self.cont_dim, self.cont_dim)
-        self.encoder = nn.Linear(input_dim, self.code_dim)
+        self.encoder = nn.Sequential(
+            nn.Linear(input_dim, self.code_dim),
+            # nn.Dropout(0.2),
+            nn.ReLU(),
+        )
         self.decoder = nn.Sequential(
             nn.Linear(self.code_dim, hidden_dim),
             nn.ReLU(),
@@ -47,7 +51,11 @@ class Model(nn.Module):
 class CausalFair(Model):
     def __init__(self, input_dim, hidden_dim, out_dim, latent_spec, det=False):
         super().__init__(input_dim, hidden_dim, out_dim, latent_spec, det)
-        self.z_to_y = nn.Linear(self.code_dim, out_dim)
+        self.z_to_y = nn.Sequential(
+            nn.Linear(self.code_dim, hidden_dim),
+            nn.LeakyReLU(0.2, True),
+            nn.Linear(hidden_dim, out_dim),
+        )
         self.z_to_s = nn.Linear(self.code_dim, self.disc_dim)
 
     def forward(self, x):
@@ -60,17 +68,17 @@ class CausalFair(Model):
         out = self.decoder(z)
         return out, z, y, q_z
 
-class GeneralFair(nn.Module):
-    '''
-    We need q(z|x, u), p(u|z)
-    '''
-    def __init__():
+# class GeneralFair(nn.Module):
+#     '''
+#     We need q(z|x, u), p(u|z)
+#     '''
+#     def __init__():
         
-        super().__init__()
+#         super().__init__()
         
 
-    def forward(self, x, u):
-        pass
+#     def forward(self, x, u):
+#         pass
 
 class FairVAE(nn.Module):
     def __init__(self, input_dim, hidden_dim, out_dim, latent_spec, det=False):

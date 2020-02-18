@@ -1,0 +1,2 @@
+Test | reloss  1.15 | wloss  0.00 | acc 85.44 | ite 0.0404
+Test | reloss  1.15 | wloss  0.00 | acc 85.27 | ite 0.0441

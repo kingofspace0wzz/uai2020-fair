@@ -12,7 +12,7 @@ from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
 
 from model.models.model import CausalFair
-from data import get_adult, get_german
+from data import get_adult, get_german, get_crime, get_bank
 from model.models.losses import kl_standard_normal
 
 from sinkhorn import sinkhorn_loss_primal
@@ -29,8 +29,9 @@ parser.add_argument('--critic_iter', type=int, default=10)
 parser.add_argument('--wstart', type=int, default=10)
 ## model parameters ##
 parser.add_argument('--latent_size', type=int, default=32)
-parser.add_argument('--hidden_dim', type=int, default=100)
+parser.add_argument('--hidden_dim', type=int, default=64)
 parser.add_argument('--disc_size', type=int, default=0)
+parser.add_argument('--det', action='store_true')
 ## main ##
 parser.add_argument('--cuda', type=int, default=0)
 parser.add_argument('--seed', type=int, default=123)
@@ -39,7 +40,10 @@ parser.add_argument('--test_size', type=float, default=0.5)
 parser.add_argument('--supervise', action='store_true')
 parser.add_argument('--label', action='store_true')
 parser.add_argument('--ite', action='store_true', help='ite as loss')
-parser.add_argument('--weight_cliping_limit', type=float, default=0.8)
+parser.add_argument('--weight_cliping_limit', type=float, default=0.01)
+parser.add_argument('--niter', type=int, default=20)
+parser.add_argument('--eps', type=float, default=1.)
+parser.add_argument('--log', type=str, default='results/log.txt')
 args = parser.parse_args()
 
 torch.manual_seed(args.seed)
@@ -63,8 +67,11 @@ class Critic(nn.Module):
 
 def train(model):
     model.train()
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.98))
-    dis_optimizer = torch.optim.Adam(critic.parameters(), lr=args.lr, betas=(0.9, 0.98))
+    # optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.98))
+    # dis_optimizer = torch.optim.Adam(critic.parameters(), lr=args.lr, betas=(0.9, 0.98))
+    optimizer = torch.optim.RMSprop(model.parameters(), lr=args.lr)
+    dis_optimizer = torch.optim.RMSprop(critic.parameters(), lr=args.lr)
+   
     cont_dim = latent_spec['cont']
     disc_dim = latent_spec['disc']
     writer = SummaryWriter("runs/fair")
@@ -88,9 +95,9 @@ def train(model):
                 labels = labels.long().squeeze(1)
                 out, z, y, q_z = model(x)
                 closs = F.cross_entropy(y, labels)  # mean
-                reloss = F.mse_loss(out, x) # mean
+                reloss = F.mse_loss(out*255, x*255, reduction='mean') / 255 # mean
                 kld = kl_standard_normal(q_z)   # mean
-                loss = closs
+                loss = closs 
                 if args.ite and epoch >= args.wstart:
                     for _ in range(args.critic_iter):
                         for p in critic.parameters():
@@ -117,9 +124,10 @@ def train(model):
                         x_1 = torch.cat((torch.ones(inputs_next.size(0), 1).to(inputs.device), inputs_next), dim=-1)
                         z_1 = model.encode(x_1).rsample()
                         dis_real = critic(z_1)
-                        sink_f = 2*sinkhorn_loss_primal(dis_int, dis_real, 1, inputs_next.size(0), 20) \
-                                - sinkhorn_loss_primal(dis_int, dis_int, 1, inputs_next.size(0), 20) \
-                                - sinkhorn_loss_primal(dis_real, dis_real, 1, inputs_next.size(0), 20)
+                        sink_f = 2*sinkhorn_loss_primal(dis_int, dis_real, args.eps, inputs_next.size(0), args.niter) \
+                                - sinkhorn_loss_primal(dis_int, dis_int, args.eps, inputs_next.size(0), args.niter) \
+                                - sinkhorn_loss_primal(dis_real, dis_real, args.eps, inputs_next.size(0), args.niter)
+                       
                         dis_optimizer.zero_grad()
                         sink_f.backward(retain_graph=True)
                         dis_optimizer.step()
@@ -135,10 +143,11 @@ def train(model):
                     x_1 = torch.cat((torch.ones(inputs_next.size(0), 1).to(inputs.device), inputs_next), dim=-1)
                     z_1 = model.encode(x_1).rsample()
                     dis_real = critic(z_1)
-                    wloss = 2*sinkhorn_loss_primal(dis_int, dis_real, 1, inputs_next.size(0), 20) \
-                            - sinkhorn_loss_primal(dis_int, dis_int, 1, inputs_next.size(0), 20) \
-                            - sinkhorn_loss_primal(dis_real, dis_real, 1, inputs_next.size(0), 20)
-                    
+                    wloss = 2*sinkhorn_loss_primal(dis_int, dis_real, args.eps, inputs_next.size(0), args.niter) \
+                            - sinkhorn_loss_primal(dis_int, dis_int, args.eps, inputs_next.size(0), args.niter) \
+                            - sinkhorn_loss_primal(dis_real, dis_real, args.eps, inputs_next.size(0), args.niter)
+                     
+
                     loss += wloss
                 else:
                     wloss = torch.zeros(1)
@@ -180,10 +189,13 @@ def evaluate(model):
     disc_dim = latent_spec['disc']
     re_loss = 0
     it_estimate = 0
+    it_estimate_z = 0
     correct = 0
     correct_g = 0
+    w_loss = 0
     size = 0
     for i, data in enumerate(test_iter):
+        data_iter = iter(test_iter)
         inputs, labels, factor = [d.to(device) for d in data]
         batch_size = inputs.size(0)
         x = torch.cat((factor, inputs), dim=-1)
@@ -194,28 +206,55 @@ def evaluate(model):
         kld = kl_standard_normal(q_z)
 
         ys = []
-        x_0 = torch.cat((torch.zeros(batch_size, 1).to(inputs.device), inputs), dim=-1)
-        z_0 = model.encode(x_0).rsample() # z ~ q(z|do(s), x)
-        x_1 = torch.cat((torch.ones(batch_size, 1).to(inputs.device), inputs), dim=-1)
-        z_1 = model.encode(x_1).rsample()
-        y_0 = model.z_to_y(z_0) # p(y|do(s), x) = \int_z p(y|z)p(z|do(s), x)
-        y_1 = model.z_to_y(z_1)   
+        z0, z1 = [], []
+        # for _ in range(10): # sample batch size of z ~ p(z|do(s))
+        #     inputs_next = data_iter.next()[0].to(device)
+        #     x_0 = torch.cat((torch.zeros(batch_size, 1).to(inputs.device), inputs_next), dim=-1)
+        #     z_0 = model.encode(x_0).rsample() # z ~ q(z|do(s), x)
+        #     x_1 = torch.cat((torch.ones(batch_size, 1).to(inputs.device), inputs_next), dim=-1)
+        #     z_1 = model.encode(x_1).rsample()
+        #     z0.append(z_0.mean(0).unsqueeze(0))
+        #     z1.append(z_1.mean(0).unsqueeze(0))
+        # z_0, z_1 = torch.cat(z0, dim=0), torch.cat(z1, dim=0)
+        # y_0 = model.z_to_y(z_0) # p(y|do(s)) = \int_z \int_x p(y|z)p(z|do(s), x)p(x)dx
+        # y_1 = model.z_to_y(z_1)   
 
         predicted = torch.max(y, dim=-1)[1]
         correct += (predicted == labels).sum().item()
-        # logits = model.s_to_p(s)
-        # predicted_g = torch.max(logits, dim=-1)[1]
-        # correct_g += (predicted_g == label_g).sum().item()
-        # it_estimate += (ys[0] - ys[1]).float().abs().sum()
-        it_estimate += (y_0 - y_1).float().abs().sum()
+        
+        # y_0 = torch.max(y_0, dim=-1)[1]
+        # y_1 = torch.max(y_1, dim=-1)[1]
+        # it_estimate += (y_0 - y_1).float().abs().sum()
+        # it_estimate_z += (z_0 - z_1).float().abs().sum()
         re_loss += reloss * batch_size
+        # w_loss += wloss * batch_size
         size += batch_size
-    it_estimate = it_estimate / size
+    model = model.to('cpu')
+    data = test_iter.dataset
+    inputs, _, _ = data[:]
+    
+    # for i in range(100):
+    x_0 = torch.cat((torch.zeros(inputs.size(0), 1), inputs), dim=-1)
+    x_1 = torch.cat((torch.ones(inputs.size(0), 1), inputs), dim=-1)
+    z_0 = model.encode(x_0).sample()
+    z_1 = model.encode(x_1).sample()
+    y_0 = model.z_to_y(z_0)
+    y_1 = model.z_to_y(z_1)
+    print(y_0)
+    # print(y_0)
+    y_0 = torch.max(y_0, dim=-1)[1]
+    y_1 = torch.max(y_1, dim=-1)[1]
+    it_estimate += (y_0 - y_1).float().abs().sum()
+
+    it_estimate = it_estimate / inputs.size(0)
     re_loss = re_loss / size
+    w_loss = w_loss / size
     acc = correct / size * 100
     # acc_g = correct_g / size * 100
     print('-'*90)
-    print('Test | reloss {:5.2f} | acc {:5.2f} | ite {:5.4f}'.format(re_loss, acc, it_estimate))
+    print('Test | reloss {:5.2f} | wloss {:5.2f} | acc {:5.2f} | ite {:5.4f}'.format(re_loss, w_loss, acc, it_estimate))
+    with open(args.log, 'a') as fd:
+        print('Test | reloss {:5.2f} | wloss {:5.2f} | acc {:5.2f} | ite {:5.4f}'.format(re_loss, w_loss, acc, it_estimate), file=fd)
 
 if __name__ == "__main__":
     
@@ -223,13 +262,17 @@ if __name__ == "__main__":
     dataset = args.data.rstrip('/').split('/')[-1]
     if dataset == 'adult.data':
         train_iter, test_iter = get_adult(args.data, args.batch_size, args.nogender, args.test_size)
-    else:
+    elif dataset == 'german.data':
         train_iter, test_iter = get_german(args.data, args.batch_size, args.test_size)
+    elif dataset == 'communities.data':
+        train_iter, test_iter = get_crime(args.data, args.batch_size, args.test_size)
+    elif dataset == 'bank.csv':
+        train_iter, test_iter = get_bank(args.data, args.batch_size, args.test_size)
 
     for _, (batch, _, _) in enumerate(train_iter):
         input_dim = batch.size(-1)
         break
-    model = CausalFair(input_dim+1, args.hidden_dim, 2, latent_spec).to(device)
+    model = CausalFair(input_dim+1, args.hidden_dim, 2, latent_spec, args.det).to(device)
     code_size = args.latent_size + args.disc_size
     critic = Critic(code_size, 1).to(device)
     train(model)
