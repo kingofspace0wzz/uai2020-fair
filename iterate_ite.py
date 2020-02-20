@@ -90,6 +90,7 @@ def train(model, ite):
             kl2_loss = 0
             mmd_loss = 0
             w_loss = 0
+            it_estimate
             for i, data in enumerate(tqdm(train_iter)):
                 # data_iter = iter(train_iter)
                 data_iter = train_iter.dataset
