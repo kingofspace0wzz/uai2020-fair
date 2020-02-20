@@ -180,7 +180,11 @@ def train(model, ite):
             it_estimate += (y_0 - y_1).float().abs().sum()
             it_estimate = it_estimate / inputs.size(0)
             model = model.to(device)
-            writer.add_scalar('ACE_{}'.format(args.data), it_estimate, epoch * len(train_iter)+i)
+            if ite:
+                writer.add_scalars('ACE {}'.format(args.data), {'ours': it_estimate}, epoch * len(train_iter)+i)
+                writer.close()
+            else:
+                writer.add_scalars('ACE {}'.format(args.data), {'baseline': it_estimate}, epoch * len(train_iter)+i)
             print('ite: {:5.2f}'.format(it_estimate))
         # for epoch in range(args.epochs):
 
