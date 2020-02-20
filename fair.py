@@ -268,11 +268,11 @@ def evaluate(model):
     print('Test | reloss {:5.2f} | wloss {:5.2f} | acc {:5.2f} | ite {:5.4f} | dp {:5.4f}'.format(re_loss, w_loss, acc, it_estimate, dem_parity))
     with open(args.log, 'a') as fd:
         print('Test | reloss {:5.2f} | wloss {:5.2f} | acc {:5.2f} | ite {:5.4f} | dp {:5.4f}'.format(re_loss, w_loss, acc, it_estimate, dem_parity), file=fd)
-    write = SummaryWriter("runs/")
-    write.add_hparams({"data":dataset, 'epochs': args.epochs, 'acc': acc, 'ite': it_estimate, 'dp': dem_parity, 'eps': args.eps, 'niter': args.niter, 'bsize': args.batch_size,
+    writer = SummaryWriter("runs/")
+    writer.add_hparams({"data":dataset, 'epochs': args.epochs, 'acc': acc, 'ite': it_estimate, 'dp': dem_parity, 'eps': args.eps, 'niter': args.niter, 'bsize': args.batch_size,
                         'cdim': args.critic_dim})
-    write.close()
-    
+    writer.close()
+
 if __name__ == "__main__":
     
     latent_spec = {'cont': args.latent_size, 'disc': args.disc_size}
