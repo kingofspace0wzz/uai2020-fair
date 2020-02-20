@@ -77,7 +77,7 @@ def train(model):
    
     cont_dim = latent_spec['cont']
     disc_dim = latent_spec['disc']
-    writer = SummaryWriter("runs/fair")
+    # writer = SummaryWriter("runs/fair")
     print('Start training.')
     try:
         for epoch in range(args.epochs):
@@ -178,10 +178,10 @@ def train(model):
             acc = correct / size * 100
             print('-'*90)
             print('Epoch: {:3d} | reloss: {:5.2f} | kld: {:5.2f} | wloss {:5.4f} | acc {:5.2f}'.format(epoch, re_loss, kld, w_loss, acc))
-            writer.add_scalar('train/reloss', re_loss, epoch * len(train_iter)+i)
-            writer.add_scalar('train/kld', kld_loss, epoch * len(train_iter)+i)
-            writer.add_scalar('train/wloss', w_loss, epoch * len(train_iter)+i)
-            writer.add_scalar('train/acc', acc, epoch * len(train_iter)+i)
+            # writer.add_scalar('train/reloss', re_loss, epoch * len(train_iter)+i)
+            # writer.add_scalar('train/kld', kld_loss, epoch * len(train_iter)+i)
+            # writer.add_scalar('train/wloss', w_loss, epoch * len(train_iter)+i)
+            # writer.add_scalar('train/acc', acc, epoch * len(train_iter)+i)
         # for epoch in range(args.epochs):
 
 
@@ -268,10 +268,11 @@ def evaluate(model):
     print('Test | reloss {:5.2f} | wloss {:5.2f} | acc {:5.2f} | ite {:5.4f} | dp {:5.4f}'.format(re_loss, w_loss, acc, it_estimate, dem_parity))
     with open(args.log, 'a') as fd:
         print('Test | reloss {:5.2f} | wloss {:5.2f} | acc {:5.2f} | ite {:5.4f} | dp {:5.4f}'.format(re_loss, w_loss, acc, it_estimate, dem_parity), file=fd)
-    with SummaryWriter() as w:
-        w.add_hparams({"data":dataset, 'epochs': args.epochs, 'acc': acc, 'ite': it_estimate, 'dp': dem_parity, 'eps': args.eps, 'niter': args.niter, 'bsize': args.batch_size,
+    write = SummaryWriter("runs/")
+    write.add_hparams({"data":dataset, 'epochs': args.epochs, 'acc': acc, 'ite': it_estimate, 'dp': dem_parity, 'eps': args.eps, 'niter': args.niter, 'bsize': args.batch_size,
                         'cdim': args.critic_dim})
-
+    write.close()
+    
 if __name__ == "__main__":
     
     latent_spec = {'cont': args.latent_size, 'disc': args.disc_size}
