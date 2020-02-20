@@ -19,6 +19,8 @@ from model.models.losses import kl_standard_normal
 from sinkhorn import sinkhorn_loss_primal, sinkhorn_loss_dual
 
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+import pandas as pd
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data', type=str, default='adult.data')
@@ -183,8 +185,10 @@ def train(model, ite):
             if ite:
                 writer.add_scalars('ACE {}'.format(args.data), {'ours': it_estimate}, epoch * len(train_iter)+i)
                 writer.close()
+                ite2.append(it_estimate)
             else:
                 writer.add_scalars('ACE {}'.format(args.data), {'baseline': it_estimate}, epoch * len(train_iter)+i)
+                ite1.append(it_estimate)
             print('ite: {:5.2f}'.format(it_estimate))
         # for epoch in range(args.epochs):
 
@@ -271,14 +275,33 @@ if __name__ == "__main__":
     for _, (batch, _, _) in enumerate(train_iter):
         input_dim = batch.size(-1)
         break
-    dataset = train_iter.dataset
-    sampler = torch.utils.data.BatchSampler(RandomSampler(range(len(dataset))), batch_size=args.batch_size, drop_last=False)
+    # dataset = train_iter.dataset
+    sampler = torch.utils.data.BatchSampler(RandomSampler(range(len(train_iter.dataset))), batch_size=args.batch_size, drop_last=False)
     model = CausalFair(input_dim+1, args.hidden_dim, 2, latent_spec, args.det).to(device)
     code_size = args.latent_size + args.disc_size
     critic = Critic(code_size, args.critic_dim).to(device)
+    ite1, ite2 = [], []
     train(model, False)
     model = CausalFair(input_dim+1, args.hidden_dim, 2, latent_spec, args.det).to(device)
     code_size = args.latent_size + args.disc_size
     critic = Critic(code_size, args.critic_dim).to(device)
     train(model, True)
     # evaluate(model)
+    print(len(ite1))
+    print(len(ite2))
+    df = pd.DataFrame({'x': range(args.epochs), 'baseline':ite1, 'ours':ite2})
+    palette = plt.get_cmap('Set1')
+
+    num = 0
+    for column in df.drop('x', axis=1):
+        num += 1
+        plt.plot(df['x'], df[column], marker='', color=palette(num),
+                 linewidth=1, alpha=0.9, label=column)
+
+    plt.legend(loc=2, ncol=2, fontsize='xx-large')
+
+    plt.xlabel("Epoch", fontsize='xx-large')
+    plt.ylabel("ACE", fontsize='xx-large')
+    plt.title("ACE vs Epoch (Adult)", fontsize='xx-large')
+
+    plt.savefig('results/iterate-ite-adult.png', bbox_inches='tight')
