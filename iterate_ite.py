@@ -68,7 +68,7 @@ class Critic(nn.Module):
     def forward(self, x):
         return self.critic(x)
 
-def train(model):
+def train(model, ite):
     model.train()
     # optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.98))
     # dis_optimizer = torch.optim.Adam(critic.parameters(), lr=args.lr, betas=(0.9, 0.98))
@@ -77,7 +77,7 @@ def train(model):
    
     cont_dim = latent_spec['cont']
     disc_dim = latent_spec['disc']
-    writer = SummaryWriter("runs/fair")
+    writer = SummaryWriter("runs/")
     print('Start training.')
     try:
         for epoch in range(args.epochs):
@@ -102,25 +102,11 @@ def train(model):
                 reloss = F.mse_loss(out*255, x*255, reduction='mean') / 255 # mean
                 kld = kl_standard_normal(q_z)   # mean
                 loss = closs 
-                if args.ite and epoch >= args.wstart:
+                if ite and epoch >= args.wstart:
                     for _ in range(args.critic_iter):
                         for p in critic.parameters():
                             p.data.clamp_(-args.weight_cliping_limit, args.weight_cliping_limit)
-                        # disloss = 0
-                        # wloss = 0
-                        # # for n in range(s.size(-1)):
-                        # x_0 = torch.cat((torch.zeros(batch_size, 1).to(inputs.device), inputs), dim=-1)
-                        # z_0 = model.encode(x_0).rsample() # z ~ q(z|do(s), x)
-                        # dis_int = critic(z_0).mean()
-                        # x_1 = torch.cat((torch.ones(batch_size, 1).to(inputs.device), inputs), dim=-1)
-                        # z_1 = model.encode(x_1).rsample()
-                        # dis_real = critic(z_1).mean()
-                        # disloss = dis_int - dis_real
-                        # wloss = dis_real - dis_int
-                        # dis_optimizer.zero_grad()
-                        # disloss.backward(retain_graph=True)
-                        # dis_optimizer.step()
-
+                
                         # inputs_next = data_iter.next()[0].to(device)
                         inputs_next = data_iter[list(sampler)[0]][0].to(device)
                         # print(inputs_next)
@@ -178,10 +164,23 @@ def train(model):
             acc = correct / size * 100
             print('-'*90)
             print('Epoch: {:3d} | reloss: {:5.2f} | kld: {:5.2f} | wloss {:5.4f} | acc {:5.2f}'.format(epoch, re_loss, kld, w_loss, acc))
-            writer.add_scalar('train/reloss', re_loss, epoch * len(train_iter)+i)
-            writer.add_scalar('train/kld', kld_loss, epoch * len(train_iter)+i)
-            writer.add_scalar('train/wloss', w_loss, epoch * len(train_iter)+i)
-            writer.add_scalar('train/acc', acc, epoch * len(train_iter)+i)
+            
+            model = model.to('cpu')
+            data = test_iter.dataset
+            inputs, _, factors = data[:]
+            x_0 = torch.cat((torch.zeros(inputs.size(0), 1), inputs), dim=-1)
+            x_1 = torch.cat((torch.ones(inputs.size(0), 1), inputs), dim=-1)
+            z_0 = model.encode(x_0).sample()
+            z_1 = model.encode(x_1).sample()
+            y_0 = model.z_to_y(z_0)
+            y_1 = model.z_to_y(z_1)
+            y_0 = torch.max(y_0, dim=-1)[1]
+            y_1 = torch.max(y_1, dim=-1)[1]
+            it_estimate += (y_0 - y_1).float().abs().sum()
+            it_estimate = it_estimate / inputs.size(0)
+            model = model.to(device)
+            writer.add_scalar('ACE_{}'.format(args.data), it_estimate, epoch * len(train_iter)+i)
+            print('ite: {:5.2f}'.format(it_estimate))
         # for epoch in range(args.epochs):
 
 
@@ -211,27 +210,9 @@ def evaluate(model):
         reloss = F.mse_loss(out, x)
         kld = kl_standard_normal(q_z)
 
-        ys = []
-        z0, z1 = [], []
-        # for _ in range(10): # sample batch size of z ~ p(z|do(s))
-        #     inputs_next = data_iter.next()[0].to(device)
-        #     x_0 = torch.cat((torch.zeros(batch_size, 1).to(inputs.device), inputs_next), dim=-1)
-        #     z_0 = model.encode(x_0).rsample() # z ~ q(z|do(s), x)
-        #     x_1 = torch.cat((torch.ones(batch_size, 1).to(inputs.device), inputs_next), dim=-1)
-        #     z_1 = model.encode(x_1).rsample()
-        #     z0.append(z_0.mean(0).unsqueeze(0))
-        #     z1.append(z_1.mean(0).unsqueeze(0))
-        # z_0, z_1 = torch.cat(z0, dim=0), torch.cat(z1, dim=0)
-        # y_0 = model.z_to_y(z_0) # p(y|do(s)) = \int_z \int_x p(y|z)p(z|do(s), x)p(x)dx
-        # y_1 = model.z_to_y(z_1)   
-
         predicted = torch.max(y, dim=-1)[1]
         correct += (predicted == labels).sum().item()
         
-        # y_0 = torch.max(y_0, dim=-1)[1]
-        # y_1 = torch.max(y_1, dim=-1)[1]
-        # it_estimate += (y_0 - y_1).float().abs().sum()
-        # it_estimate_z += (z_0 - z_1).float().abs().sum()
         re_loss += reloss * batch_size
         # w_loss += wloss * batch_size
         size += batch_size
@@ -286,9 +267,13 @@ if __name__ == "__main__":
         input_dim = batch.size(-1)
         break
     dataset = train_iter.dataset
+    sampler = torch.utils.data.BatchSampler(RandomSampler(range(len(dataset))), batch_size=args.batch_size, drop_last=False)
     model = CausalFair(input_dim+1, args.hidden_dim, 2, latent_spec, args.det).to(device)
     code_size = args.latent_size + args.disc_size
     critic = Critic(code_size, args.critic_dim).to(device)
-    sampler = torch.utils.data.BatchSampler(RandomSampler(range(len(dataset))), batch_size=args.batch_size, drop_last=False)
-    train(model)
-    evaluate(model)
+    train(model, False)
+    model = CausalFair(input_dim+1, args.hidden_dim, 2, latent_spec, args.det).to(device)
+    code_size = args.latent_size + args.disc_size
+    critic = Critic(code_size, args.critic_dim).to(device)
+    train(model, True)
+    # evaluate(model)

@@ -76,3 +76,7 @@ Test | reloss  1.19 | wloss  0.00 | acc 100.00 | ite 0.0000 | dp 27.7254
 Test | reloss  1.12 | wloss  0.00 | acc 85.11 | ite 0.0219 | dp 0.2567
 Test | reloss  1.08 | wloss  0.00 | acc 85.17 | ite 0.0275 | dp 0.9917
 Test | reloss  1.10 | wloss  0.00 | acc 84.62 | ite 0.0581 | dp 1.7731
+Test | reloss  1.16 | wloss  0.00 | acc 73.20 | ite 0.1160 | dp 2.1542
+Test | reloss  1.17 | wloss  0.00 | acc 73.40 | ite 0.1040 | dp 3.9814
+Test | reloss  1.15 | wloss  0.00 | acc 73.40 | ite 0.0820 | dp 4.1846
+Test | reloss  1.17 | wloss  0.00 | acc 73.80 | ite 0.0980 | dp 4.4209
