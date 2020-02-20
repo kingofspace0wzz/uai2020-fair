@@ -119,7 +119,7 @@ def get_german(path, batch_size, test_size=0.5):
     test_loader = DataLoader(test_data, batch_size, shuffle=True)
     return train_loader, test_loader
 
-def load_crime(path, sensitive='racePctBlack'):
+def load_crime(path, sensitive='blackPerCap'):
     column_names = ['{}'.format(i) for i in range(127)]
     column_names[-1] = 'target'
     column_names[7] = 'racePctBlack'
@@ -131,7 +131,7 @@ def load_crime(path, sensitive='racePctBlack'):
     # sensitive attributes; we identify 'race' and 'sex' as sensitive attributes
     sensitive_attribs = [sensitive]
     Z = (input_data.loc[:, sensitive_attribs]
-         .assign(racePctBlack=lambda df: (df[sensitive].astype(int) >= 0.2).astype(int)))
+         .assign(blackPerCap=lambda df: (df[sensitive].astype(int) >= 0.2).astype(int)))
    
     # targets; 1 when someone makes over 50k , otherwise 0
     y = (input_data['target'].astype(int) >= 0.24).astype(int)
@@ -201,7 +201,7 @@ def load_bank(path, nogender):
     print("sensitives Z: {} samples, {} attributes".format(Z.shape[0], Z.shape[1]))
     return X, y, Z
 
-def get_bank(path, batch_size, nogender=False, test_size=0.5):
+def get_bank(path, batch_size, nogender=False, test_size=0.2):
     X, Y, Z = load_bank(path, nogender)
     # X_test, y_test, Z_test = load_adult('adult.test', nogender)
     # split into train/test set

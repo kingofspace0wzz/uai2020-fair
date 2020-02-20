@@ -1,0 +1,78 @@
+Test | wloss  0.00 | acc 85.34 | ite 0.0616
+Test | wloss  0.00 | acc 100.00 | ite 0.0000
+Test | wloss  0.00 | acc 90.93 | ite 0.0160
+Test | wloss  0.00 | acc 46.38 | ite 0.0488
+Test | wloss  0.00 | acc 100.00 | ite 0.0000
+Test | wloss  0.00 | acc 97.79 | ite 0.0000
+Test | wloss  0.00 | acc 75.00 | ite 0.0340
+Test | wloss  0.00 | acc 50.55 | ite 0.0201
+Test | wloss  0.00 | acc 50.55 | ite 0.0201
+Test | wloss  0.00 | acc 50.55 | ite 0.0140
+Test | wloss  0.00 | acc 97.79 | ite 0.0000
+Test | reloss  1.12 | wloss  0.00 | acc 85.08 | ite 0.0505
+Test | wloss  0.00 | acc 85.52 | ite 0.0249
+Test | wloss  0.00 | acc 71.80 | ite 0.0320
+Test | wloss  0.00 | acc 75.20 | ite 0.0300
+Test | reloss  1.17 | wloss  0.00 | acc 76.40 | ite 0.1060
+Test | wloss  0.00 | acc 72.20 | ite 0.0960
+Test | wloss  0.00 | acc 75.20 | ite 0.0300
+Test | wloss  0.00 | acc 71.80 | ite 0.0320
+Test | reloss  0.70 | wloss  0.00 | acc 72.00 | ite 0.0580
+Test | reloss  1.17 | wloss  0.00 | acc 76.40 | ite 0.1060
+Test | reloss  1.17 | wloss  0.00 | acc 76.40 | ite 0.1060
+Test | reloss  2.42 | wloss  0.00 | acc 97.79 | ite 0.0020
+Test | reloss  1.25 | wloss  0.00 | acc 100.00 | ite 0.0000
+Test | reloss  1.13 | wloss  0.00 | acc 85.31 | ite 0.0439
+Test | reloss  1.13 | wloss  0.00 | acc 85.41 | ite 0.0446
+Test | reloss  1.13 | wloss  0.00 | acc 85.30 | ite 0.0430
+Test | reloss  1.13 | wloss  0.00 | acc 85.39 | ite 0.0439
+Test | reloss  1.09 | wloss  0.00 | acc 85.42 | ite 0.0388
+Test | reloss  1.15 | wloss  0.00 | acc 76.20 | ite 0.0820
+Test | reloss  1.16 | wloss  0.00 | acc 75.40 | ite 0.0860
+Test | reloss  1.16 | wloss  0.00 | acc 73.20 | ite 0.1000
+Test | reloss  1.15 | wloss  0.00 | acc 76.20 | ite 0.0820
+Test | reloss  1.17 | wloss  0.00 | acc 74.40 | ite 0.1220
+Test | reloss  1.11 | wloss  0.00 | acc 85.36 | ite 0.0393
+Test | reloss  1.12 | wloss  0.00 | acc 85.50 | ite 0.0311
+Test | reloss  1.12 | wloss  0.00 | acc 85.46 | ite 0.0332
+Test | reloss  1.12 | wloss  0.00 | acc 85.52 | ite 0.0290
+Test | reloss  1.10 | wloss  0.00 | acc 85.32 | ite 0.0312
+Test | reloss  1.08 | wloss  0.00 | acc 85.47 | ite 0.0311
+Test | reloss  1.16 | wloss  0.00 | acc 74.20 | ite 0.0960
+Test | reloss  1.16 | wloss  0.00 | acc 76.60 | ite 0.0820
+Test | reloss  1.16 | wloss  0.00 | acc 76.00 | ite 0.0900
+Test | reloss  1.16 | wloss  0.00 | acc 76.00 | ite 0.0780
+Test | reloss  1.17 | wloss  0.00 | acc 74.00 | ite 0.0680 | dp 3.8068
+Test | reloss  1.16 | wloss  0.00 | acc 76.00 | ite 0.0780 | dp 4.1927
+Test | reloss  1.17 | wloss  0.00 | acc 74.00 | ite 0.0680 | dp 3.8068
+Test | reloss  1.16 | wloss  0.00 | acc 76.40 | ite 0.0780 | dp 3.9974
+Test | reloss  1.16 | wloss  0.00 | acc 76.40 | ite 0.0780 | dp 3.9974
+Test | reloss  1.16 | wloss  0.00 | acc 72.60 | ite 0.0820 | dp 3.6933
+Test | reloss  1.16 | wloss  0.00 | acc 74.40 | ite 0.0800 | dp 4.4375
+Test | reloss  1.16 | wloss  0.00 | acc 75.60 | ite 0.0840 | dp 4.2823
+Test | reloss  1.16 | wloss  0.00 | acc 76.40 | ite 0.0780 | dp 3.9974
+Test | reloss  1.16 | wloss  0.00 | acc 76.40 | ite 0.0780 | dp 3.9974
+Test | reloss  1.16 | wloss  0.00 | acc 76.00 | ite 0.0780 | dp 3.8534
+Test | reloss  1.15 | wloss  0.00 | acc 76.20 | ite 0.0800 | dp 3.9997
+Test | reloss  1.16 | wloss  0.00 | acc 74.40 | ite 0.0860 | dp 3.6384
+Test | reloss  1.16 | wloss  0.00 | acc 74.40 | ite 0.0860 | dp 3.6384
+Test | reloss  1.16 | wloss  0.00 | acc 75.00 | ite 0.1320 | dp 1.6079
+Test | reloss  1.17 | wloss  0.00 | acc 74.60 | ite 0.1060 | dp 2.1163
+Test | reloss  1.17 | wloss  0.00 | acc 74.60 | ite 0.1060 | dp 2.1163
+Test | reloss  1.16 | wloss  0.00 | acc 74.20 | ite 0.1280 | dp 0.9630
+Test | reloss  1.17 | wloss  0.00 | acc 77.00 | ite 0.1020 | dp 1.9835
+Test | reloss  1.17 | wloss  0.00 | acc 75.00 | ite 0.1200 | dp 1.7042
+Test | reloss  1.15 | wloss  0.00 | acc 74.00 | ite 0.1040 | dp 2.7438
+Test | reloss  1.16 | wloss  0.00 | acc 75.60 | ite 0.1000 | dp 2.5808
+Test | reloss  1.15 | wloss  0.00 | acc 76.40 | ite 0.1200 | dp 2.6618
+Test | reloss  1.15 | wloss  0.00 | acc 73.00 | ite 0.0660 | dp 4.4190
+Test | reloss  1.15 | wloss  0.00 | acc 73.80 | ite 0.0580 | dp 5.6137
+Test | reloss  1.16 | wloss  0.00 | acc 72.00 | ite 0.0760 | dp 4.9621
+Test | reloss  1.16 | wloss  0.00 | acc 72.80 | ite 0.0480 | dp 7.6493
+Test | reloss 93.86 | wloss  0.00 | acc 95.89 | ite 0.0080 | dp 12.0143
+Test | reloss  1.19 | wloss  0.00 | acc 100.00 | ite 0.0000 | dp 28.1203
+Test | reloss  1.31 | wloss  0.00 | acc 100.00 | ite 0.0000 | dp 69.3882
+Test | reloss  1.19 | wloss  0.00 | acc 100.00 | ite 0.0000 | dp 27.7254
+Test | reloss  1.12 | wloss  0.00 | acc 85.11 | ite 0.0219 | dp 0.2567
+Test | reloss  1.08 | wloss  0.00 | acc 85.17 | ite 0.0275 | dp 0.9917
+Test | reloss  1.10 | wloss  0.00 | acc 84.62 | ite 0.0581 | dp 1.7731

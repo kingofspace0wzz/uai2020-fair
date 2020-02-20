@@ -18,3 +18,4 @@ Test | reloss  1.10 | wloss  0.00 | acc 100.00 | ite 0.0000
 Test | reloss  0.92 | wloss  0.00 | acc 97.79 | ite 0.0000
 Test | reloss  1.94 | wloss  0.00 | acc 97.29 | ite 0.0060
 Test | reloss  1.94 | wloss  0.00 | acc 97.29 | ite 0.0060
+Test | reloss  1.12 | wloss  0.00 | acc 85.08 | ite 0.0505
