@@ -14,7 +14,7 @@ from torch.utils.data import RandomSampler
 
 from model.models.model import CausalFair
 from data import get_adult, get_german, get_crime, get_bank
-from model.models.losses import kl_standard_normal
+from model.models.losses import kl_standard_normal, compute_mmd
 
 from sinkhorn import sinkhorn_loss_primal, sinkhorn_loss_dual
 
@@ -32,7 +32,7 @@ parser.add_argument('--alpha', type=float, default=1.)
 ## model parameters ##
 parser.add_argument('--latent_size', type=int, default=32)
 parser.add_argument('--hidden_dim', type=int, default=64)
-parser.add_argument('--disc_size', type=int, default=0)
+parser.add_argument('--disc_size', type=int, default=2)
 parser.add_argument('--det', action='store_true')
 parser.add_argument('--critic_dim', type=int, default=5)
 ## main ##
@@ -47,6 +47,7 @@ parser.add_argument('--weight_cliping_limit', type=float, default=0.8)
 parser.add_argument('--niter', type=int, default=20)
 parser.add_argument('--eps', type=float, default=1.)
 parser.add_argument('--log', type=str, default='results/log.txt')
+parser.add_argument('--method', type=str, default='vfae')
 args = parser.parse_args()
 
 torch.manual_seed(args.seed)
@@ -68,13 +69,25 @@ class Critic(nn.Module):
     def forward(self, x):
         return self.critic(x)
 
+class Discriminator(nn.Module):
+    def __init__(self, input_dim, out_dim, hidden_dim=100):
+        super().__init__()
+        self.D = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.LeakyReLU(0.1),
+            nn.Linear(hidden_dim, out_dim)
+        )
+
+    def forward(self, x):
+        return self.D(x)
+
 def train(model):
     model.train()
     # optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.98))
     # dis_optimizer = torch.optim.Adam(critic.parameters(), lr=args.lr, betas=(0.9, 0.98))
     optimizer = torch.optim.RMSprop(model.parameters(), lr=args.lr)
     dis_optimizer = torch.optim.RMSprop(critic.parameters(), lr=args.lr)
-   
+    d_optimizer = torch.optim.RMSprop(model.z_to_s.parameters(), lr=args.lr)
     cont_dim = latent_spec['cont']
     disc_dim = latent_spec['disc']
     # writer = SummaryWriter("runs/fair")
@@ -101,7 +114,19 @@ def train(model):
                 closs = F.cross_entropy(y, labels)  # mean
                 reloss = F.mse_loss(out*255, x*255, reduction='mean') / 255 # mean
                 kld = kl_standard_normal(q_z)   # mean
-                loss = closs 
+                z_0 = model.encode(torch.cat((torch.zeros(inputs.size(0), 1).to(device), inputs), dim=-1)).rsample()
+                z_1 = model.encode(torch.cat((torch.ones(inputs.size(0), 1).to(device), inputs), dim=-1)).rsample()
+                mmd = compute_mmd(z_0, z_1)
+                s = model.z_to_s(z.detach())
+                loss = closs
+                if args.method == 'vfae':
+                    loss += reloss + kld + 100 * batch_size * mmd
+                if args.method == 'mi':
+                    sloss = F.cross_entropy(s, factor.long().squeeze(1))
+                    d_optimizer.zero_grad()
+                    sloss.backward(retain_graph=True)
+                    d_optimizer.step()
+                    loss -= sloss
                 if args.ite and epoch >= args.wstart:
                     for _ in range(args.critic_iter):
                         for p in critic.parameters():
@@ -293,6 +318,7 @@ if __name__ == "__main__":
     model = CausalFair(input_dim+1, args.hidden_dim, 2, latent_spec, args.det).to(device)
     code_size = args.latent_size + args.disc_size
     critic = Critic(code_size, args.critic_dim).to(device)
+    discriminator = Discriminator(code_size, 1).to(device)
     sampler = torch.utils.data.BatchSampler(RandomSampler(range(len(dataset))), batch_size=args.batch_size, drop_last=False)
     train(model)
     evaluate(model)
